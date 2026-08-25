@@ -1,0 +1,17 @@
+# Install PyTorch and TorchVision wheels appropriate for your CUDA version first:
+# https://pytorch.org/get-started/locally/
+torch==2.12.0
+torchvision==0.27.0
+
+# Diffusion model stack
+diffusers==0.32.0
+transformers==4.56.2
+accelerate==1.13.0
+peft==0.19.1
+safetensors==0.7.0
+huggingface_hub==0.36.2
+
+# Image generation and utilities
+numpy==1.26.4
+pillow==12.2.0
+tqdm==4.67.3
