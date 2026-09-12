@@ -19,7 +19,7 @@
 <div align="center">
 
 [![Website](https://img.shields.io/badge/Homepage-Website-87CEEB)](https://xinr-tang.github.io/MMDiff-homepage/)
-[![ISPRS](https://img.shields.io/badge/ISPRS-Paper-2563EB)](https://www.sciencedirect.com/science/article/pii/S0924271626004089?dgcid=author)
+[![ISPRS](https://img.shields.io/badge/ISPRS-Paper-2563EB)](#)
 [![HuggingFace](https://img.shields.io/badge/HuggingFace-Model-F9D371)](https://huggingface.co/XinRan-Tang/MM-Diff)
 [![Dataset](https://img.shields.io/badge/Dataset-Access-green)](https://huggingface.co/datasets/XinRan-Tang/Optical-SAR-Infrared)
 
@@ -45,7 +45,7 @@ Collecting spatially consistent multi-modal remote sensing (MMRS) images remains
 
 ## 📢 &nbsp; Latest Updates
 
-- **2026-08-25** — Training code will be released soon.
+- **2026-09-12** — Training code is now available.
 - **2026-08-25** — Dataset and model are available on Hugging Face 🎊 ！
 - **2026-08-25** — Sampling code is now available ✨.
 - **2026-08-15** — Our paper has been accepted by **ISPRS 2026**  🎉 🎉 🎉 !!! 
@@ -115,6 +115,48 @@ PYTHON="$CONDA_PREFIX/bin/python" bash scripts/sampling.sh
 
 Generated OPT, SAR, and IR images are saved under `result/opt/`, `result/sar/`, and `result/ir/`, respectively.
 
+## 🏋️ &nbsp; Training
 
+Train the three branches in order: **OPT → SAR → IR**. The OPT branch is first trained on all optical categories, then the SAR and IR LoRA branches are trained from the resulting OPT model. SAR and IR can be trained for any of the following nine categories: `beach`, `bridge`, `desert`, `farmland`, `lake`, `mountain`, `residential`, `river`, and `ship`. The default category is `ship`; set `CATEGORY` to train another category.
+
+Before training, update `project_root` in `scripts/train_opt.sh`, `scripts/train_sar.sh`, and `scripts/train_ir.sh` to your local MMDiff directory. Also ensure that `optical_sar_infrared_data_dir` in `mmdiff/config.py` points to the Optical-SAR-Infrared dataset. By default, trained checkpoints are saved under `model-v1/`.
+
+```bash
+cd /path/to/MMDiff
+conda activate mmdiff
+
+# 1. Train the OPT branch.
+bash scripts/train_opt.sh
+
+# 2. Train the SAR LoRA branch.
+bash scripts/train_sar.sh
+
+# 3. Train the IR LoRA branch.
+bash scripts/train_ir.sh
+```
+
+After training, run the complete OPT → SAR → IR sampling pipeline with the generated checkpoints:
+
+```bash
+bash scripts/sampling.sh \
+  --model_path path/to/model-v1/mmdiff-opt \
+  --sar_lora_path path/to/model-v1/mmdiff-sar/sd-sar-lora-ship \
+  --ir_lora_path path/to/model-v1/mmdiff-ir/sd-ir-lora-ship
+```
+
+## 📚 &nbsp; Citation
+
+If you find MMDiff useful, please cite:
+
+```bibtex
+@article{tang2026mmdiff,
+  title={MMDiff: Multi-modal remote sensing image generation via cross-modality spatial feature transfer},
+  author={Tang, Haojun and Zhao, Wenda and Cui, Hengshuai and Wang, Haipeng},
+  journal={ISPRS Journal of Photogrammetry and Remote Sensing},
+  volume={241},
+  pages={93--108},
+  year={2026},
+  publisher={Elsevier}
+}
+```
 </div>
-
