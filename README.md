@@ -45,7 +45,7 @@ Collecting spatially consistent multi-modal remote sensing (MMRS) images remains
 
 ## 📢 &nbsp; Latest Updates
 
-- **2026-09-12** — Training code is now available.
+- **2026-09-12** — Training code is now available 🎉 !
 - **2026-08-25** — Dataset and model are available on Hugging Face 🎊 ！
 - **2026-08-25** — Sampling code is now available ✨.
 - **2026-08-15** — Our paper has been accepted by **ISPRS 2026**  🎉 🎉 🎉 !!! 
@@ -115,7 +115,7 @@ PYTHON="$CONDA_PREFIX/bin/python" bash scripts/sampling.sh
 
 Generated OPT, SAR, and IR images are saved under `result/opt/`, `result/sar/`, and `result/ir/`, respectively.
 
-## 🏋️ &nbsp; Training
+### 🏋️ Training
 
 Train the three branches in order: **OPT → SAR → IR**. The OPT branch is first trained on all optical categories, then the SAR and IR LoRA branches are trained from the resulting OPT model. SAR and IR can be trained for any of the following nine categories: `beach`, `bridge`, `desert`, `farmland`, `lake`, `mountain`, `residential`, `river`, and `ship`. The default category is `ship`; set `CATEGORY` to train another category.
 
