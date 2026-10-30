@@ -19,12 +19,21 @@ cd "${PROJECT_ROOT}"
 echo "Using prompt: ${PROMPT}"
 
 echo "[MMDiff] Step 1/3: generating OPT image and extracting spatial features..."
-"${PYTHON}" "${PROJECT_ROOT}/mmdiff/sampling_OPT.py" --n "ship" --prompt "${PROMPT}" --device cuda:0 "$@"
+"${PYTHON}" "${PROJECT_ROOT}/mmdiff/sampling_OPT.py" --n "ship" --prompt "${PROMPT}" --device cuda:0 \
+  --attn_save_mode true --resnet_save_mode true \
+  --attn_replace_mode false --resnet_replace_mode false \
+  "$@"
 
 echo "[MMDiff] Step 2/3: generating SAR image..."
-"${PYTHON}" "${PROJECT_ROOT}/mmdiff/sampling_SAR.py" --n "ship" --prompt "${PROMPT}" --device cuda:0 "$@"
+"${PYTHON}" "${PROJECT_ROOT}/mmdiff/sampling_SAR.py" --n "ship" --prompt "${PROMPT}" --device cuda:0 \
+  --attn_save_mode false --resnet_save_mode false \
+  --attn_replace_mode true --resnet_replace_mode true \
+  "$@"
 
 echo "[MMDiff] Step 3/3: generating IR image..."
-"${PYTHON}" "${PROJECT_ROOT}/mmdiff/sampling_IR.py" --n "ship" --prompt "${PROMPT}" --device cuda:0 "$@"
+"${PYTHON}" "${PROJECT_ROOT}/mmdiff/sampling_IR.py" --n "ship" --prompt "${PROMPT}" --device cuda:0 \
+  --attn_save_mode false --resnet_save_mode false \
+  --attn_replace_mode true --resnet_replace_mode true \
+  "$@"
 
 echo "[MMDiff] Done. Results are in ${PROJECT_ROOT}/result/."
