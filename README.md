@@ -63,8 +63,6 @@ Collecting spatially consistent multi-modal remote sensing (MMRS) images remains
 
 <div align="justify">
 
-We release MMDiff-WHU, a new version of MMDiff fine-tuned on MMDiff-WHU-dataset, which is derived from the WHU-OPT-SAR dataset.
-
 We release **MMDiff-WHU**, a new version of **MMDiff** fine-tuned on **MMDiff-WHU-dataset**, which is derived from the **WHU-OPT-SAR** dataset. **WHU-OPT-SAR** is a multi-modal remote sensing land-cover dataset from Wuhan University. We cropped its imagery into **512×512** tiles and assigned each tile to the semantic class occupying the largest area in its segmentation mask (i.e., a majority vote by area). The original dataset contains seven land-cover classes; we retain four—**city**, **farmland**, **forest**, and **water**—by merging city and village into a single category and excluding road, others, and background. Each tile was then captioned with GPT-4o-mini, yielding paired optical (OPT), synthetic aperture radar (SAR), near-infrared (NIR), and text data. The OPT branch was fine-tuned on all four classes, while the SAR and NIR branches were fine-tuned with class-specific LoRA adapters.
 
 See [MMDiff-WHU](https://huggingface.co/XinRan-Tang/MMDiff-WHU) for the model checkpoints and [MMDiff-WHU-dataset](https://huggingface.co/datasets/XinRan-Tang/MMDiff-WHU-dataset) for the dataset.
