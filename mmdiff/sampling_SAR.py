@@ -13,7 +13,7 @@ import torch
 from PIL import Image
 from tqdm import tqdm
 
-from config import SamplingConfig
+from config import parse_sampling_config
 from register import (
     AttentionStore,
     ResidualStore,
@@ -37,7 +37,7 @@ def set_seed(seed: int):
 
 
 def main():
-    cfg = SamplingConfig()
+    cfg = parse_sampling_config()
     set_seed(cfg.seed)
     output_path = os.path.join(cfg.output_dir, "sar")
     weight_dtype = torch.bfloat16
@@ -103,8 +103,12 @@ def main():
     # ---------------- ResNet feature injection ----------------
     residual_controller = ResidualStore(cfg.resnet_path)
     register_resnet_control(unet, residual_controller)
-    residual_controller.set_save_mode(False)
-    residual_controller.set_replace_mode(False)
+    residual_controller.set_save_mode(
+        cfg.resnet_save_mode if cfg.resnet_save_mode is not None else False
+    )
+    residual_controller.set_replace_mode(
+        cfg.resnet_replace_mode if cfg.resnet_replace_mode is not None else False
+    )
 
     t_half = timesteps[: int(len(timesteps) * cfg.resnet_time)]
     residual_controller.inject_residuals_for_range(
@@ -118,8 +122,12 @@ def main():
     attn_controller = AttentionStore(cfg.attn_path)
     register_attention_control(unet, attn_controller)
     attn_controller.set_timesteps_to_inject(timesteps)
-    attn_controller.set_save_mode(False)
-    attn_controller.set_replace_mode(True)
+    attn_controller.set_save_mode(
+        cfg.attn_save_mode if cfg.attn_save_mode is not None else False
+    )
+    attn_controller.set_replace_mode(
+        cfg.attn_replace_mode if cfg.attn_replace_mode is not None else True
+    )
 
     attn_layer = [int(item) for item in cfg.attn_layer.split(",")]
     attn_controller.set_replace_layers(

@@ -97,6 +97,103 @@ class OpticalSARInfraredDataset(Dataset):
             ).input_ids[0]
         return item
 
+class WHUOpticalSARDataset(Dataset):
+    """Read RGB, SAR, or NIR images from the mmdiff-whu dataset.
+
+    The dataset is organized as ``{modality}/{split}/{category}/*.jpg`` with
+    per-modality ``train.jsonl``/``test.jsonl`` annotations.  Each JSONL row
+    contains ``image_path`` (relative to the modality directory) and ``text``.
+
+    ``opt`` loads every category (5584 training images).  ``sar`` and ``ir``
+    load a single category at a time, selected manually via ``category``.
+    The returned sample schema and preprocessing deliberately mirror
+    :class:`OpticalSARInfraredDataset`, so the existing training loop and
+    ``collate_optical_sar_infrared`` can be reused unchanged.
+    """
+
+    VALID_MODALITIES = {"opt", "sar", "ir"}
+    VALID_CATEGORIES = {"city", "farmland", "forest", "water"}
+
+    def __init__(
+        self,
+        dataset_root: str,
+        modality: str,
+        category: Optional[str] = None,
+        tokenizer=None,
+        resolution: int = 256,
+        center_crop: bool = True,
+        random_flip: bool = True,
+    ):
+        if modality not in self.VALID_MODALITIES:
+            raise ValueError(
+                f"modality must be one of {sorted(self.VALID_MODALITIES)}, got {modality!r}."
+            )
+        if modality == "opt" and category is not None:
+            raise ValueError("OPT training uses all categories; do not set category.")
+        if modality in {"sar", "ir"} and category is None:
+            raise ValueError(
+                f"{modality.upper()} training requires a category, "
+                f"choose one of {sorted(self.VALID_CATEGORIES)}."
+            )
+        if category is not None and category not in self.VALID_CATEGORIES:
+            raise ValueError(
+                f"category must be one of {sorted(self.VALID_CATEGORIES)}, got {category!r}."
+            )
+
+        self.dataset_root = Path(dataset_root)
+        self.modality = modality
+        self.category = category
+        self.tokenizer = tokenizer
+        annotation_path = self.dataset_root / modality / "train.jsonl"
+        if not annotation_path.is_file():
+            raise FileNotFoundError(f"Training annotations not found: {annotation_path}")
+
+        with annotation_path.open("r", encoding="utf-8") as annotation_file:
+            self.samples = [json.loads(line) for line in annotation_file if line.strip()]
+
+        if category is not None:
+            self.samples = [
+                sample
+                for sample in self.samples
+                if Path(sample["image_path"]).parent.name == category
+            ]
+
+        self.image_transform: Callable = transforms.Compose(
+            [
+                transforms.Resize(resolution, interpolation=transforms.InterpolationMode.BILINEAR),
+                transforms.CenterCrop(resolution) if center_crop else transforms.RandomCrop(resolution),
+                transforms.RandomHorizontalFlip() if random_flip else transforms.Lambda(lambda image: image),
+                transforms.ToTensor(),
+                transforms.Normalize([0.5], [0.5]),
+            ]
+        )
+
+    def __len__(self) -> int:
+        return len(self.samples)
+
+    def __getitem__(self, index: int) -> Dict[str, object]:
+        sample = self.samples[index]
+        image_path = self.dataset_root / self.modality / sample["image_path"]
+        if not image_path.is_file():
+            raise FileNotFoundError(f"Image referenced by JSONL does not exist: {image_path}")
+
+        with Image.open(image_path) as image:
+            pixel_values = self.image_transform(image.convert("RGB"))
+        text = sample["text"]
+        item: Dict[str, object] = {
+            "pixel_values": pixel_values,
+            "text": text,
+            "image_path": str(image_path),
+        }
+        if self.tokenizer is not None:
+            item["input_ids"] = self.tokenizer(
+                text,
+                max_length=self.tokenizer.model_max_length,
+                padding="max_length",
+                truncation=True,
+                return_tensors="pt",
+            ).input_ids[0]
+        return item
 
 def collate_optical_sar_infrared(examples):
     """Batch processed image/text pairs while retaining their source texts."""

@@ -55,8 +55,12 @@ from diffusers.utils.import_utils import is_xformers_available
 from diffusers.utils.torch_utils import is_compiled_module
 
 from transformers import HfArgumentParser
-from config import OSIConfig
-from dataset import OpticalSARInfraredDataset, collate_optical_sar_infrared
+from config import OSIConfig, WHUOpticalSARConfig
+from dataset import (
+    OpticalSARInfraredDataset,
+    WHUOpticalSARDataset,
+    collate_optical_sar_infrared,
+)
 
 if is_wandb_available():
     import wandb
@@ -77,15 +81,24 @@ def deepspeed_zero_init_disabled_context_manager():
         return [deepspeed_plugin.zero3_init_context_manager(enable=False)]
 
 def parse_args():
-    parser = HfArgumentParser(OSIConfig)
-    args = parser.parse_args_into_dataclasses()[0]
+    selector = argparse.ArgumentParser(add_help=False)
+    selector.add_argument(
+        "--is_OSI",
+        type=lambda value: {"true": True, "false": False}[value.lower()],
+        default=None,
+    )
+    selector_args, remaining_args = selector.parse_known_args()
+    is_OSI = True if selector_args.is_OSI is None else selector_args.is_OSI
+    config_class = OSIConfig if is_OSI else WHUOpticalSARConfig
+    parser = HfArgumentParser(config_class)
+    args = parser.parse_args_into_dataclasses(args=remaining_args)[0]
+    args.is_OSI = is_OSI
 
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
     if env_local_rank != -1 and env_local_rank != args.local_rank:
         args.local_rank = env_local_rank
 
     return args
-
 
 def get_modality_checkpoint_dir(output_dir, modality):
     """Keep each modality's resumable states inside its own model directory."""
@@ -104,13 +117,15 @@ def main():
     # 1. Parse command-line arguments and initialize the accelerator
     # ------------------------------------------------------
     args = parse_args()
-    if args.dataset_modality not in {"opt", "sar", "ir"}:
+    is_OSI = args.is_OSI
+    supported_modalities = {"opt", "sar", "ir"}
+    if args.dataset_modality not in supported_modalities:
         raise ValueError(f"Unsupported dataset_modality: {args.dataset_modality!r}")
     is_lora_training = args.dataset_modality in {"sar", "ir"}
     if args.dataset_modality == "opt" and args.dataset_category is not None:
         raise ValueError("OPT training uses all categories; do not set dataset_category.")
     if is_lora_training and not args.dataset_category:
-        raise ValueError("SAR and IR LoRA training require --dataset_category (for example, ship).")
+        raise ValueError("SAR and IR LoRA training require --dataset_category (for example, city).")
     checkpoint_dir = get_modality_checkpoint_dir(args.output_dir, args.dataset_modality)
     logging_dir = os.path.join(args.output_dir, args.logging_dir)
 
@@ -173,8 +188,8 @@ def main():
         unet.requires_grad_(False)
         unet.add_adapter(
             LoraConfig(
-                r=4,
-                lora_alpha=4,
+                r=args.r,
+                lora_alpha=args.lora_alpha,
                 init_lora_weights="gaussian",
                 target_modules=["to_k", "to_q", "to_v", "to_out.0"],
             )
@@ -246,7 +261,8 @@ def main():
     # ------------------------------------------------------
     # 3. Initialize the dataset
     # ------------------------------------------------------
-    train_dataset = OpticalSARInfraredDataset(
+    dataset_class = OpticalSARInfraredDataset if is_OSI else WHUOpticalSARDataset
+    train_dataset = dataset_class(
         dataset_root=args.optical_sar_infrared_data_dir,
         modality=args.dataset_modality,
         category=args.dataset_category,

@@ -14,7 +14,7 @@ import torch
 from PIL import Image
 from tqdm import tqdm
 
-from config import SamplingConfig
+from config import parse_sampling_config
 from register import (
     AttentionStore,
     ResidualStore,
@@ -35,9 +35,8 @@ def set_seed(seed: int):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-
 def main():
-    cfg = SamplingConfig()
+    cfg = parse_sampling_config()
     set_seed(cfg.seed)
     output_path = os.path.join(cfg.output_dir, "opt")
     weight_dtype = torch.bfloat16
@@ -102,13 +101,21 @@ def main():
     # single UNet forward pass without conflict.
     attn_controller = AttentionStore(cfg.attn_path)
     register_attention_control(unet, attn_controller)
-    attn_controller.set_save_mode(True)
-    attn_controller.set_replace_mode(False)
+    attn_controller.set_save_mode(
+        cfg.attn_save_mode if cfg.attn_save_mode is not None else True
+    )
+    attn_controller.set_replace_mode(
+        cfg.attn_replace_mode if cfg.attn_replace_mode is not None else False
+    )
 
     resnet_controller = ResidualStore(cfg.resnet_path)
     register_resnet_control(unet, resnet_controller)
-    resnet_controller.set_save_mode(True)
-    resnet_controller.set_replace_mode(False)
+    resnet_controller.set_save_mode(
+        cfg.resnet_save_mode if cfg.resnet_save_mode is not None else True
+    )
+    resnet_controller.set_replace_mode(
+        cfg.resnet_replace_mode if cfg.resnet_replace_mode is not None else False
+    )
 
     # ---------------- Diffusion model inference ----------------
     for _i, t in enumerate(tqdm(scheduler.timesteps)):

@@ -27,16 +27,20 @@ class ResidualStore:
         self.layer_range = None
 
     def set_save_mode(self, mode: bool):
+
         self.save_mode = mode
 
     def set_replace_mode(self, mode: bool):
+
         self.replace_mode = mode
 
     def set_timestep(self, timestep):
+
         self.current_timestep = timestep
 
     def store_residual(self, residual, place_in_unet, layer_idx):
-        if not self.save_mode: 
+
+        if not self.save_mode:
             return
         if self.current_timestep is None:
             raise ValueError("Timestep is not set. Call `set_timestep` before storing residuals.")
@@ -48,16 +52,18 @@ class ResidualStore:
         torch.save(residual.cpu(), file_path)
 
     def load_residual(self, timestep, place_in_unet, layer_idx, device=None):
+
         file_path = os.path.join(self.save_path, f"timestep_{timestep}", f"{place_in_unet}_resnet_{layer_idx}.pt")
         # print("Load:", file_path)
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Residual file not found: {file_path}")
         residual = torch.load(file_path)
         if device is not None:
-            residual = residual.to(device) 
+            residual = residual.to(device)
         return residual
 
     def inject_residual(self, timestep, place_in_unet, layer_idx, residual):
+
         if timestep not in self.injected_residuals:
             self.injected_residuals[timestep] = {}
         if place_in_unet not in self.injected_residuals[timestep]:
@@ -65,9 +71,10 @@ class ResidualStore:
         self.injected_residuals[timestep][place_in_unet][layer_idx] = residual
 
     def inject_residuals_for_range(self, timesteps, place_in_unet, layer_range, device):
+
         self.layer_range = layer_range
-        for timestep in timesteps:
-            for layer_idx in self.layer_range:
+        for timestep in timesteps: # 981
+            for layer_idx in self.layer_range:  # [0,1,2,3,4]
                 try:
                     residual = self.load_residual(timestep, place_in_unet, layer_idx, device=device)
                     self.inject_residual(timestep, place_in_unet, layer_idx, residual)
@@ -77,17 +84,21 @@ class ResidualStore:
                     print(f"Error loading residual for timestep {timestep}, layer {layer_idx}: {e}")
 
     def get_inject_residual(self, timestep, place_in_unet, layer_idx):
+
         if timestep not in self.injected_residuals:
             # print(f"[DEBUG] No residuals injected for timestep {timestep}")
             return None
+
 
         if place_in_unet not in self.injected_residuals[timestep]:
             # print(f"[DEBUG] No residuals for place_in_unet '{place_in_unet}' at timestep {timestep}")
             return None
 
+
         if layer_idx not in self.injected_residuals[timestep][place_in_unet]:
             # print(f"[DEBUG] No residuals for layer {layer_idx} at timestep {timestep}, place_in_unet '{place_in_unet}'")
             return None
+
 
         residual = self.injected_residuals[timestep][place_in_unet][layer_idx]
 
@@ -97,30 +108,46 @@ class ResidualStore:
 
         return residual
 
+    # def get_inject_residual(self, timestep, place_in_unet, layer_idx):
+
+    #     if (
+    #         timestep in self.injected_residuals
+    #         and place_in_unet in self.injected_residuals[timestep]
+    #         and layer_idx in self.injected_residuals[timestep][place_in_unet]
+    #     ):
+    #         return self.injected_residuals[timestep][place_in_unet][layer_idx]
+    #     return None
+
 def register_resnet_control(model, controller):
     def ca_forward(self, place_in_unet, layer_idx=None):
+
         original_forward = self.forward
 
         def forward(hidden_states, temb=None):
+
             output = original_forward(hidden_states, temb)
 
             if place_in_unet == 'up':
+
                 if controller.save_mode:
                     controller.store_residual(output, place_in_unet, layer_idx)
 
             if place_in_unet == 'up' and layer_idx is not None and controller.layer_range is not None:
                 if layer_idx in controller.layer_range:
+
                     if controller.replace_mode:
                         injected_residual = controller.get_inject_residual(
                             controller.current_timestep, place_in_unet, layer_idx)
                         if injected_residual is not None:
-                            # # 使用 AdaIN 对 injected_residual 和 output 进行风格对齐
+
 
                             output = injected_residual
 
             return output
 
         return forward
+
+
 
     if controller is None:
         raise ValueError("No controller, you must set a controller!")
@@ -141,6 +168,8 @@ def register_resnet_control(model, controller):
     sub_nets = model.named_children()
 
     for net in sub_nets:
+
+
         if "down" in net[0]:  # 8
             layer_down_idx = 0
             resnet_down_count, layer_down_idx = register_recr(net[1], 0, "down", layer_down_idx)
@@ -162,38 +191,47 @@ class AttentionStore:
         self.cross_att_count = 0
         self.self_att_count = 0
         self.current_timestep = None
-        self.save_mode = True 
-        self.replace_mode = False 
+        self.save_mode = True
+        self.replace_mode = False
         self.file_counters = {"self_attention": 0, "cross_attention": 0}
-        self.attn_layers = [] 
-        self.components = [] 
+        self.attn_layers = []
+        self.components = []
         self.timesteps_to_inject = []
 
     def set_save_mode(self, mode: bool):
+
         self.save_mode = mode
 
     def set_replace_mode(self, mode: bool):
+
         self.replace_mode = mode
 
     def set_timestep(self, timestep):
+
         self.current_timestep = timestep
         self.file_counters = {"self_attention": 0, "cross_attention": 0}
 
     def set_timesteps_to_inject(self, timesteps):
+
         self.timesteps_to_inject = timesteps
 
     def should_inject(self):
+
         return self.current_timestep in self.timesteps_to_inject
 
     def set_replace_layers(self, attn_layers, components):
-        """
-        attn_layers: list of layer indices to replace, e.g., [1]
-        components: list of components to replace, e.g., ['q', 'k']
-        """
+
+
+
+
+
         self.attn_layers = attn_layers
         self.components = components
 
     def _get_save_directory(self, attention_type, component, layer_index):
+
+
+
         if self.current_timestep is None:
             raise ValueError("Timestep is not set. Call set_timestep before saving features.")
         timestep_dir = os.path.join(self.save_path, f"timestep_{self.current_timestep}")
@@ -203,17 +241,29 @@ class AttentionStore:
         return component_dir
 
     def save_features(self, query, attention_type, place_in_unet, layer_index):
+
+
+
         if not self.save_mode:
             return
+
+
         q_dir = self._get_save_directory(attention_type, "q", layer_index)
+
 
         self.file_counters[attention_type] += 1
         counter = self.file_counters[attention_type]
+
+
         torch.save(query.cpu(), os.path.join(q_dir, f"up_{counter}.pt"))
 
     def load_features(self, attention_type, time, layer_index, device=None):
+
+
+
         features = {}
         for component in self.components:
+
             feature_path = os.path.join(
                 self.save_path,
                 f"timestep_{time}",
@@ -222,9 +272,13 @@ class AttentionStore:
                 f"up_{layer_index}.pt"
             )
             try:
+
                 feature = torch.load(feature_path)
                 if device is not None:
                     feature = feature.to(device)
+                # print(f"Loaded {component} feature from layer {layer_index}: {feature.shape}")
+
+
                 features[component] = feature
 
             except FileNotFoundError:
@@ -236,6 +290,7 @@ class AttentionStore:
 
 def register_attention_control(model, controller):
     def attention_forward(self, layer_index, place_in_unet, attention_type):
+
         def forward(hidden_states, encoder_hidden_states=None, attention_mask=None, **kwargs):
             residual = hidden_states
 
@@ -266,7 +321,10 @@ def register_attention_control(model, controller):
             key = self.head_to_batch_dim(key)
             value = self.head_to_batch_dim(value)
 
+
             if place_in_unet == 'up' and controller.should_inject() and controller.replace_mode and layer_index in controller.attn_layers:
+
+
                 features = controller.load_features(attention_type, time=controller.current_timestep,
                                                     layer_index=layer_index, device=hidden_states.device)
                 for component in controller.components:
@@ -278,11 +336,13 @@ def register_attention_control(model, controller):
             hidden_states = torch.bmm(attention_probs, value)
             hidden_states = self.batch_to_head_dim(hidden_states)
 
+
             hidden_states = self.to_out[0](hidden_states)
             hidden_states = self.to_out[1](hidden_states)
 
             if input_ndim == 4:
                 hidden_states = hidden_states.transpose(-1, -2).reshape(batch_size, channel, height, width)
+
 
             if place_in_unet == 'up' and controller.save_mode:
                 controller.save_features(
@@ -326,6 +386,12 @@ def register_attention_control(model, controller):
     # print(f"Self-Attention Layers: {controller.self_att_count}")
 
 def register_single_channel_decoder(vae_instance):
+
+
+
+
+
+
     import types
     import torch
     from typing import Union
@@ -339,10 +405,13 @@ def register_single_channel_decoder(vae_instance):
             z = self.post_quant_conv(z)
 
         dec = self.decoder(z)
+
         dec = dec.mean(dim=1, keepdim=True)
 
         if not return_dict:
             return (dec,)
 
         return DecoderOutput(sample=dec)
+
+
     vae_instance._decode = types.MethodType(new_decode, vae_instance)

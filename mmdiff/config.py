@@ -1,6 +1,7 @@
 """Centralized configuration for MMDiff sampling and training pipelines."""
 
-from dataclasses import dataclass, field
+import argparse
+from dataclasses import dataclass, field, fields
 from typing import Optional, List
 
 @dataclass
@@ -37,6 +38,66 @@ class SamplingConfig:
     attn_layer: str = "1,2,3,4,5,6,7,8,9" # Using all query feature for injection.
     component: str = "q" # Self-attention component to inject: q.
 
+
+    # Attention/ResNet controller modes. Each flag overrides the corresponding
+    # set_save_mode/set_replace_mode call in the sampling scripts. Leave unset
+    # (None) to keep each script's built-in profile:
+    #   OPT    -> save=True,  replace=False (extracts and stores features)
+    #   SAR/IR -> attn save=False/replace=True; resnet save=False/replace=False.
+    attn_save_mode: Optional[bool] = None
+    attn_replace_mode: Optional[bool] = None
+    resnet_save_mode: Optional[bool] = None
+    resnet_replace_mode: Optional[bool] = None
+
+def _str2bool(value: str) -> bool:
+    """Parse a boolean CLI flag, accepting true/false (case-insensitive)."""
+    normalized = value.lower()
+    if normalized not in {"true", "false"}:
+        raise argparse.ArgumentTypeError("expected 'true' or 'false'")
+    return normalized == "true"
+
+def parse_sampling_config() -> SamplingConfig:
+    """Build :class:`SamplingConfig` from command-line overrides.
+
+    Every option defaults to ``None`` at the CLI level, so an omitted flag
+    retains the dataclass default while a supplied flag takes precedence.
+    """
+    cli = argparse.ArgumentParser(
+        description="MMDiff sampling configuration",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    defaults = SamplingConfig()
+    bool_fields = {
+        "attn_save_mode",
+        "attn_replace_mode",
+        "resnet_save_mode",
+        "resnet_replace_mode",
+    }
+    for item in fields(SamplingConfig):
+        default = getattr(defaults, item.name)
+        if item.name in bool_fields:
+            # Optional boolean: parse true/false strings, keep None when omitted.
+            cli.add_argument(
+                f"--{item.name}",
+                type=_str2bool,
+                default=None,
+                help=f"Override SamplingConfig.{item.name} (default: script built-in)",
+            )
+        else:
+            cli.add_argument(
+                f"--{item.name}",
+                type=type(default),
+                default=None,
+                help=f"Override SamplingConfig.{item.name} (default: {default})",
+            )
+
+    overrides = {
+        name: value
+        for name, value in vars(cli.parse_args()).items()
+        if value is not None
+    }
+    return SamplingConfig(**overrides)
+
 @dataclass
 class BaseTrainingConfig:
     # ============================================================
@@ -51,6 +112,11 @@ class BaseTrainingConfig:
     variant: Optional[str] = None
     # Kept separate for compatibility with non-EMA checkpoints used by UNet.
     non_ema_revision: Optional[str] = None
+
+    # LoRA adapter settings for SAR and IR training. They can be overridden
+    # from the command line with --r and --lora_alpha.
+    r: int = 4
+    lora_alpha: int = 4
 
     # Dataset
     dataset_name: Optional[str] = None
@@ -196,14 +262,25 @@ class BaseTrainingConfig:
 
     tracker_project_name: str = "mmdiff"
 
-
 @dataclass
 class OSIConfig(BaseTrainingConfig):
     """Training configuration specific to the Optical-SAR-Infrared dataset."""
 
     # ``dataset_modality`` selects the corresponding {opt,sar,ir}_train.jsonl annotation file.
-    optical_sar_infrared_data_dir: str = "/media/ubuntun/hdd/dataset/Optical-SAR-Infrared"
+    optical_sar_infrared_data_dir: str = "path/to/Optical-SAR-Infrared"
     dataset_modality: str = "opt"
     # SAR and IR LoRA runs train one semantic category at a time (for example,ship). 
     # OPT uses all categories and leaves this unset.
     dataset_category: Optional[str] = None
+
+@dataclass
+class WHUOpticalSARConfig(BaseTrainingConfig):
+    """Training configuration specific to the whu-opt-sar dataset."""
+
+    optical_sar_infrared_data_dir: str = "path/to/MMDiff-WHU-dataset"
+    dataset_modality: str = "opt"
+    resolution: int = 512
+    dataset_category: Optional[str] = None
+
+
+
