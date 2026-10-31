@@ -18,8 +18,8 @@
 
 <div align="center">
 
-[![Website](https://img.shields.io/badge/Homepage-Website-87CEEB)](#)
-[![ISPRS](https://img.shields.io/badge/ISPRS-Paper-2563EB)](#)
+[![Website](https://img.shields.io/badge/Homepage-Website-87CEEB)](https://xinr-tang.github.io/MMDiff-homepage/)
+[![ISPRS](https://img.shields.io/badge/ISPRS-Paper-2563EB)](https://www.sciencedirect.com/science/article/abs/pii/S0924271626004089)
 
 </div>
 
