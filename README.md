@@ -52,7 +52,7 @@ Collecting spatially consistent multi-modal remote sensing (MMRS) images remains
 
 ## 📢 &nbsp; Latest Updates
 
-- **2026-10-30** — We released MMDiff results on **WHU-OPT-SAR**; the model and dataset are now available 🔥
+- **2026-10-30** — We released MMDiff results on **WHU-OPT-SAR**, the model and dataset are now available 🔥
 - **2026-09-12** — Training code is now available 🎉 !
 - **2026-08-25** — Dataset and model are available on Hugging Face 🎊 ！
 - **2026-08-25** — Sampling code is now available 🎉 !
